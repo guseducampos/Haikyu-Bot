@@ -286,6 +286,107 @@ async def remove_invited_participant(update: Update, context: ContextTypes.DEFAU
             "I couldn't find a game for that day 😅")
 
 
+async def remove_specific_participant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+    invited_name = message_text.split()[1]
+    day = None
+    for word in message_text.split():
+        day = find_day(word)
+        if day is not None:
+            break
+
+    if not os.path.exists("games.json"):
+        await update.message.reply_text("No hay partidos programados 😅")
+        return
+
+    with open("games.json", "r") as file:
+        games = json.load(file)
+
+    game_to_update = None
+    for game in reversed(games):
+        game_date = datetime.strptime(game["date"], "%d/%m/%Y")
+        if game_date.weekday() == day:
+            game_to_update = game
+            break
+    else:
+        game_to_update = games[-1]
+
+    if game_to_update:
+        username = invited_name
+        removed_entry = None
+        for participant in game_to_update["participants"]:
+            if f"{username}" in participant and "invitado" not in participant:
+                removed_entry = participant
+                game_to_update["participants"].remove(participant)
+                break
+
+        if removed_entry:
+            with open("games.json", "w") as file:
+                json.dump(games, file)
+
+            await update.message.reply_text(
+                f"Sad your guess won't join us on 😢")
+        else:
+            await update.message.reply_text(
+                "I couldn't find the participant 🤔")
+    else:
+        await update.message.reply_text(
+            "I couldn't find a game for that day 😅")
+
+
+async def remove_invited_participant_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message_text = update.message.text
+    # find the username with @ in the text
+
+    username = next(
+        (word for word in message_text.split() if "@" in word), None)
+    invited_name = message_text.split()[1]
+    day = None
+    for word in message_text.split():
+        day = find_day(word)
+        if day is not None:
+            break
+
+    if not os.path.exists("games.json"):
+        await update.message.reply_text("No hay partidos programados 😅")
+        return
+
+    with open("games.json", "r") as file:
+        games = json.load(file)
+
+    game_to_update = None
+    for game in reversed(games):
+        game_date = datetime.strptime(game["date"], "%d/%m/%Y")
+        if game_date.weekday() == day:
+            game_to_update = game
+            break
+    else:
+        game_to_update = games[-1]
+
+    if game_to_update:
+        removed_entry = None
+        for participant in game_to_update["participants"]:
+            full_invited_name = f"{invited_name} Invitado por {username}"
+            print(full_invited_name)
+            if full_invited_name in participant:
+                removed_entry = participant
+                game_to_update["participants"].remove(participant)
+                break
+
+        if removed_entry:
+            with open("games.json", "w") as file:
+                json.dump(games, file)
+
+            await update.message.reply_text(
+                f"Sad your guess won't join us on 😢")
+        else:
+            await update.message.reply_text(
+                "I couldn't find the guess 🤔")
+    else:
+        await update.message.reply_text(
+            "I couldn't find a game for that day 😅")
+
+
 async def list_participants(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message_text = update.message.text
     day = None
@@ -318,7 +419,8 @@ async def list_participants(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(
                 "There are no players for the given day 😢")
         else:
-            response = "Jugadores inscritos:\n\n"
+            time = game_to_list["time"]
+            response = f"Hora: {time}  Jugadores inscritos:\n\n"
             for i, participant in enumerate(participants, start=1):
                 response += f"{i}. {participant}\n"
             await update.message.reply_text(response)
@@ -370,12 +472,16 @@ def main():
 
     dp.add_handler(CommandHandler("agendar", schedule))
     dp.add_handler(CommandHandler("confirmo", confirm))
+    dp.add_handler(CommandHandler("voy", confirm))
     dp.add_handler(CommandHandler("invitar", invite))
     dp.add_handler(CommandHandler("yanovoy", remove_participant))
     dp.add_handler(CommandHandler("yanova", remove_invited_participant))
     dp.add_handler(CommandHandler("quienesvan", list_participants))
     dp.add_handler(CommandHandler("limpiar", cleanup_games))
     dp.add_handler(CommandHandler("limpiartodo", cleanup_all))
+    dp.add_handler(CommandHandler("alv", remove_specific_participant))
+    dp.add_handler(CommandHandler(
+        "alvinvitado", remove_invited_participant_all))
 
     dp.run_polling()
 
